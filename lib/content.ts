@@ -195,6 +195,8 @@ export interface Project {
   linkLabel?: string;
   /** Looping showcase video (16:9), shown in the hover preview. */
   video?: string;
+  /** First-frame still for `video`, shown until the video has buffered. */
+  poster?: string;
   /** Photo set (3:4) cycled in the hover preview instead of a video. */
   gallery?: string[];
   accent: string;

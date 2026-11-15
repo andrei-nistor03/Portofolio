@@ -1,10 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight } from "@phosphor-icons/react";
 import { gsap, useGSAP } from "@/lib/gsap";
 import type { Project } from "@/lib/content";
+import { useInView } from "@/lib/useInView";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 
 const SLIDE_SECONDS = 1.8;
 
@@ -16,15 +18,27 @@ function isLight(hex: string) {
   return 0.299 * r + 0.587 * g + 0.114 * b > 160;
 }
 
-// Looping showcase video. It only downloads once first needed and only plays
-// while its preview is showing, so six videos never decode at the same time.
-function VideoMedia({ src, active }: { src: string; active: boolean }) {
+// Looping showcase video. `load` starts buffering ahead of time (it's near the
+// viewport) so it is ready before it scrolls in; `active` plays it. Only one
+// instance is active at a time, so phones never decode two videos at once.
+function VideoMedia({
+  src,
+  poster,
+  load,
+  active,
+}: {
+  src: string;
+  poster?: string;
+  load: boolean;
+  active: boolean;
+}) {
   const ref = useRef<HTMLVideoElement>(null);
   const [armed, setArmed] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (active) setArmed(true);
-  }, [active]);
+    if (load || active) setArmed(true);
+  }, [load, active]);
 
   useEffect(() => {
     const v = ref.current;
@@ -36,24 +50,41 @@ function VideoMedia({ src, active }: { src: string; active: boolean }) {
   return (
     <video
       ref={ref}
-      src={armed ? src : undefined}
+      // Without a poster, the #t fragment makes iOS paint the first frame
+      // instead of an empty box.
+      src={armed ? (poster ? src : `${src}#t=0.001`) : undefined}
+      poster={poster}
       muted
       loop
       playsInline
-      preload="none"
-      className="absolute inset-0 h-full w-full object-cover"
+      disablePictureInPicture
+      preload={armed ? "auto" : "none"}
+      onLoadedData={() => setReady(true)}
+      className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
+        ready || poster ? "opacity-100" : "opacity-0"
+      }`}
     />
   );
 }
 
 // Photo set cycled with a crossfade and a slow push-in, only while visible.
-function GalleryMedia({ images, alt, active }: { images: string[]; alt: string; active: boolean }) {
+function GalleryMedia({
+  images,
+  alt,
+  load,
+  active,
+}: {
+  images: string[];
+  alt: string;
+  load: boolean;
+  active: boolean;
+}) {
   const root = useRef<HTMLDivElement>(null);
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {
-    if (active) setArmed(true);
-  }, [active]);
+    if (load || active) setArmed(true);
+  }, [load, active]);
 
   // Plain effect (not useGSAP): the cleanup must run on every deactivate so
   // the cycle stops and never stacks up across hovers.
@@ -97,6 +128,7 @@ function GalleryMedia({ images, alt, active }: { images: string[]; alt: string; 
               src={src}
               alt={i === 0 ? alt : ""}
               fill
+              loading="eager"
               sizes="(min-width: 768px) 320px, 100vw"
               className="object-cover"
             />
@@ -106,7 +138,17 @@ function GalleryMedia({ images, alt, active }: { images: string[]; alt: string; 
   );
 }
 
-function Media({ p, active, className = "" }: { p: Project; active: boolean; className?: string }) {
+function Media({
+  p,
+  load,
+  active,
+  className = "",
+}: {
+  p: Project;
+  load: boolean;
+  active: boolean;
+  className?: string;
+}) {
   const light = isLight(p.accent);
   return (
     <div
@@ -123,28 +165,120 @@ function Media({ p, active, className = "" }: { p: Project; active: boolean; cla
         <span className="label opacity-70">{p.kind}</span>
         <span className="display text-[clamp(2.6rem,5vw,4.5rem)] leading-[0.85]">{p.name}</span>
       </div>
-      {p.video && <VideoMedia src={p.video} active={active} />}
-      {p.gallery && <GalleryMedia images={p.gallery} alt={`${p.name} lookbook`} active={active} />}
+      {p.video && <VideoMedia src={p.video} poster={p.poster} load={load} active={active} />}
+      {p.gallery && (
+        <GalleryMedia images={p.gallery} alt={`${p.name} lookbook`} load={load} active={active} />
+      )}
     </div>
   );
 }
 
-// Mobile: the inline media plays while it is on screen.
-function InlineMedia({ p }: { p: Project }) {
+// Mobile inline media. It starts buffering about two screens before it scrolls
+// in; whether it plays is decided by useCentredMedia (one at a time).
+function InlineMedia({
+  p,
+  index,
+  active,
+  register,
+}: {
+  p: Project;
+  index: number;
+  active: boolean;
+  register: (i: number, el: HTMLDivElement | null) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
+  const [near, setNear] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const io = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { threshold: 0.35 });
+    register(index, el);
+    // Hidden with display:none on desktop, which never intersects, so
+    // nothing loads there.
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setNear(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "200% 0px 200% 0px" },
+    );
     io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    return () => {
+      io.disconnect();
+      register(index, null);
+    };
+  }, [index, register]);
   return (
     <div ref={ref} className="md:hidden">
-      <Media p={p} active={inView} className={p.gallery ? "aspect-[4/5] w-full" : "aspect-video w-full"} />
+      <Media
+        p={p}
+        load={near}
+        active={active}
+        className={p.gallery ? "aspect-[4/5] w-full" : "aspect-video w-full"}
+      />
     </div>
   );
+}
+
+// Picks the one inline media that plays: of those meaningfully on screen, the
+// one whose centre is closest to the viewport centre.
+function useCentredMedia() {
+  const els = useRef(new Map<number, HTMLDivElement>());
+  const [current, setCurrent] = useState<number | null>(null);
+  const register = useCallback((i: number, el: HTMLDivElement | null) => {
+    if (el) els.current.set(i, el);
+    else els.current.delete(i);
+  }, []);
+
+  useEffect(() => {
+    const visible = new Set<number>();
+    let raf = 0;
+    const pick = () => {
+      raf = 0;
+      const vh = window.innerHeight;
+      let best: number | null = null;
+      let bestDist = Infinity;
+      visible.forEach((i) => {
+        const r = els.current.get(i)?.getBoundingClientRect();
+        if (!r) return;
+        // Ignore a sliver peeking in at the edge.
+        const shown = Math.min(r.bottom, vh) - Math.max(r.top, 0);
+        if (shown < Math.min(r.height, vh) * 0.35) return;
+        const dist = Math.abs(r.top + r.height / 2 - vh / 2);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = i;
+        }
+      });
+      setCurrent(best);
+    };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(pick);
+    };
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        const i = Number((e.target as HTMLElement).dataset.mediaIndex);
+        if (e.isIntersecting) visible.add(i);
+        else visible.delete(i);
+      }
+      schedule();
+    });
+    els.current.forEach((el, i) => {
+      el.dataset.mediaIndex = String(i);
+      io.observe(el);
+    });
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, []);
+
+  return { current, register };
 }
 
 // Preview box size per media shape: 16:9 for site videos, 3:4 for photo sets.
@@ -161,6 +295,16 @@ export default function WorkList({ items }: { items: Project[] }) {
   const root = useRef<HTMLDivElement>(null);
   const preview = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<number | null>(null);
+  const mobile = useCentredMedia();
+  // The hover preview is only for a fine pointer. Taps also fire pointerenter,
+  // which used to start the hidden preview video on phones.
+  const canHover = useMediaQuery("(hover: hover) and (pointer: fine)");
+  // Buffer every preview once the list is within a screen, so hover is instant.
+  const listNear = useInView(root, "100% 0px");
+  const [previewLoad, setPreviewLoad] = useState(false);
+  useEffect(() => {
+    if (canHover && listNear) setPreviewLoad(true);
+  }, [canHover, listNear]);
 
   const { contextSafe } = useGSAP(
     () => {
@@ -234,7 +378,7 @@ export default function WorkList({ items }: { items: Project[] }) {
                   dim ? "md:opacity-30" : ""
                 }`}
               >
-                <InlineMedia p={p} />
+                <InlineMedia p={p} index={i} active={mobile.current === i} register={mobile.register} />
 
                 {/* Type size lives on the mask so its em-based headroom matches the title. */}
                 <div className="split-mask display text-[clamp(3.2rem,8vw,8.5rem)]">
@@ -287,7 +431,7 @@ export default function WorkList({ items }: { items: Project[] }) {
             className="absolute inset-0 overflow-hidden rounded-sm shadow-[0_30px_80px_-20px_rgba(58,23,133,0.45)] transition-opacity duration-300"
             style={{ opacity: active === i ? 1 : 0 }}
           >
-            <Media p={p} active={active === i} className="h-full w-full" />
+            <Media p={p} load={previewLoad} active={canHover && active === i} className="h-full w-full" />
           </div>
         ))}
       </div>

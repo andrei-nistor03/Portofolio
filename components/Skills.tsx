@@ -244,6 +244,9 @@ export default function Skills() {
                       alt={`${c.title}, ${c.type.toLowerCase()} issued by ${c.issuer}`}
                       width={96}
                       height={96}
+                      // Small and few: fetch with the page instead of lazily
+                      // as the panel fades in.
+                      loading="eager"
                       className="h-20 w-20 md:h-24 md:w-24"
                     />
                     <span className="flex items-center gap-2">
