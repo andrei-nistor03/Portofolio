@@ -196,7 +196,7 @@ export default function Timeline() {
     <section
       ref={root}
       id="timeline"
-      className="relative overflow-hidden bg-paper-deep md:h-[100svh]"
+      className="relative overflow-hidden bg-paper-deep md:h-[var(--app-h)]"
     >
       <div
         ref={track}

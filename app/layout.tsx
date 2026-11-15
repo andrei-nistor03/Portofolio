@@ -27,9 +27,21 @@ const personLd = {
   alumniOf: "Polytechnic University of Timișoara",
 };
 
+// Sets --app-h to the screen height in px before first paint, for the tall
+// scroll sections. In-app browsers (Instagram, Snapchat, ...) show and hide
+// their bars by resizing the whole web view, which changes every viewport unit
+// (vh, svh and lvh alike) and made a 520svh section grow or shrink by hundreds
+// of px on each scroll-direction change. On touch devices it only updates when
+// the width changes (rotation); a desktop window keeps following resizes.
+const appHeightScript = `(function(){var d=document.documentElement,w=-1,t=matchMedia("(pointer: coarse)").matches;function s(){if(t&&innerWidth===w)return;w=innerWidth;d.style.setProperty("--app-h",innerHeight+"px")}s();addEventListener("resize",s)})()`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={thunder.variable}>
+    // The script above writes a style attribute on <html> before hydration.
+    <html lang="en" className={thunder.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: appHeightScript }} />
+      </head>
       <body>
         <script
           type="application/ld+json"

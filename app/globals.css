@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Stable screen height, set in px by a script in app/layout.tsx. Falls back to
+   svh before it runs (or without JS). */
+:root {
+  --app-h: 100svh;
+}
+
 @font-face {
   font-family: "Space Grotesk";
   font-style: normal;

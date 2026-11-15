@@ -69,10 +69,12 @@ export default function Studio() {
   );
 
   return (
-    <section ref={root} id="studio" className="relative h-[520svh] bg-ink text-paper">
-      {/* lvh/svh never change as the mobile toolbar shows or hides (dvh does,
-          which resized the stage and its canvas mid-scroll). lvh fills the screen
-          even with the toolbar hidden; the bottom padding keeps copy above it. */}
+    <section ref={root} id="studio" className="relative h-[calc(var(--app-h)*5.2)] bg-ink text-paper">
+      {/* Section height uses --app-h (see app/layout.tsx) so it never changes
+          mid-scroll, which would shift everything below it. The stage can use
+          lvh: it lives inside that fixed height, so its size never moves the
+          page. lvh fills the screen with the browser toolbar hidden; the bottom
+          padding keeps the copy above the toolbar when it shows. */}
       <div className="sticky top-0 h-[100lvh] overflow-hidden">
         {/* Wordmark sits behind the transparent canvas, so the walls stand in front of it. */}
         <div className="absolute inset-0 flex items-center justify-center">
