@@ -214,6 +214,7 @@ export const projects: Project[] = [
     href: links.ecandidat,
     linkLabel: "ecandidat.ro",
     video: "/projects/videos/ecandidat.mp4",
+    poster: "/projects/videos/ecandidat.webp",
     accent: "#2b4bff",
   },
   {
@@ -226,6 +227,7 @@ export const projects: Project[] = [
     href: links.utopia,
     linkLabel: "utopiafriedchicken.ro",
     video: "/projects/videos/utopia.mp4",
+    poster: "/projects/videos/utopia.webp",
     accent: "#ff5a1f",
   },
   {
@@ -238,6 +240,7 @@ export const projects: Project[] = [
     href: links.linkhaus,
     linkLabel: "linkhaus.vercel.app",
     video: "/projects/videos/linkhaus.mp4",
+    poster: "/projects/videos/linkhaus.webp",
     accent: "#8a5cff",
   },
   {
@@ -260,6 +263,7 @@ export const projects: Project[] = [
     body: "Art bar: paper-and-typewriter visual identity, events feed, table reservations, bilingual RO/EN",
     stack: ["Concept", "Visual identity", "i18n"],
     video: "/projects/videos/cuib-darte.mp4",
+    poster: "/projects/videos/cuib-darte.webp",
     accent: "#c8ff4d",
   },
   {
@@ -270,6 +274,7 @@ export const projects: Project[] = [
     body: "Mood-based cocktail picker, cinematic motion, 3D product shots, reservations",
     stack: ["Concept", "Motion", "3D"],
     video: "/projects/videos/nocturne.mp4",
+    poster: "/projects/videos/nocturne.webp",
     accent: "#3a1785",
   },
 ];

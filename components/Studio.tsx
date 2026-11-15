@@ -1,15 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { ArrowUpRight } from "@phosphor-icons/react";
 import { gsap, useGSAP } from "@/lib/gsap";
 import { sceneState } from "@/lib/sceneState";
 import { useInView } from "@/lib/useInView";
 import { links, studioChapters } from "@/lib/content";
 
-const loadScene = () => import("./three/StudioScene");
-const StudioScene = dynamic(loadScene, { ssr: false });
+const StudioScene = dynamic(() => import("./three/StudioScene"), { ssr: false });
 
 // Scroll budget, as fractions of the section's scroll length:
 // 0.00-0.18 wordmark settles, 0.18-0.72 chapters, 0.72-1.00 dive through the door.
@@ -17,24 +16,11 @@ const DIVE_START = 0.72;
 
 export default function Studio() {
   const root = useRef<HTMLElement>(null);
-  // The scene mounts once and then stays mounted. Unmounting it on scroll-away
-  // used to throw away the WebGL context, so coming back meant a blank stage
-  // while it rebuilt (and browsers cap how many contexts a page may create).
-  const near = useInView(root, "150% 0px");
+  // The scene mounts with the page (behind the first-load loader, which waits
+  // for it to draw) and then stays mounted. Unmounting it on scroll-away used
+  // to throw away the WebGL context, so coming back meant a blank stage while
+  // it rebuilt (and browsers cap how many contexts a page may create).
   const active = useInView(root, "0px");
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    if (near) setMounted(true);
-  }, [near]);
-  // Warm the chunk, model and texture while the browser is idle, so a jump
-  // straight to the section from the nav doesn't land on an empty stage.
-  useEffect(() => {
-    const ric = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1500));
-    const id = ric(() => {
-      loadScene();
-    });
-    return () => (window.cancelIdleCallback ?? window.clearTimeout)(id as number);
-  }, []);
 
   useGSAP(
     () => {
@@ -83,8 +69,11 @@ export default function Studio() {
   );
 
   return (
-    <section ref={root} id="studio" className="relative h-[520vh] bg-ink text-paper">
-      <div className="sticky top-0 h-[100dvh] overflow-hidden">
+    <section ref={root} id="studio" className="relative h-[520svh] bg-ink text-paper">
+      {/* lvh/svh never change as the mobile toolbar shows or hides (dvh does,
+          which resized the stage and its canvas mid-scroll). lvh fills the screen
+          even with the toolbar hidden; the bottom padding keeps copy above it. */}
+      <div className="sticky top-0 h-[100lvh] overflow-hidden">
         {/* Wordmark sits behind the transparent canvas, so the walls stand in front of it. */}
         <div className="absolute inset-0 flex items-center justify-center">
           <span
@@ -95,7 +84,7 @@ export default function Studio() {
           </span>
         </div>
 
-        {mounted && <StudioScene active={active} />}
+        <StudioScene active={active} />
 
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(13,13,13,0.75)_100%)]" />
 
@@ -116,7 +105,7 @@ export default function Studio() {
           </a>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[1600px] px-4 pb-10 md:px-8 md:pb-14">
+        <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[1600px] px-4 pb-[calc(100lvh-100svh+2.5rem)] md:px-8 md:pb-[calc(100lvh-100svh+3.5rem)]">
           <div className="relative min-h-[12rem]">
             <div className="studio-intro absolute bottom-0 left-0 max-w-[24ch]">
               <p className="text-xl leading-snug md:text-[1.7rem] md:leading-[1.15] md:tracking-[-0.015em]">

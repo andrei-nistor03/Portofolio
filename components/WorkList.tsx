@@ -18,9 +18,25 @@ function isLight(hex: string) {
   return 0.299 * r + 0.587 * g + 0.114 * b > 160;
 }
 
-// Looping showcase video. `load` starts buffering ahead of time (it's near the
-// viewport) so it is ready before it scrolls in; `active` plays it. Only one
-// instance is active at a time, so phones never decode two videos at once.
+// Videos buffer one at a time, in the order they near the viewport, so the
+// next one down gets the whole connection instead of splitting it five ways.
+const warmQueue: (() => Promise<void>)[] = [];
+let warming = false;
+async function drainWarmQueue() {
+  warming = true;
+  while (warmQueue.length) await warmQueue.shift()!();
+  warming = false;
+}
+function enqueueWarm(task: () => Promise<void>) {
+  warmQueue.push(task);
+  if (!warming) drainWarmQueue();
+}
+// Never let one slow file stall the rest of the queue.
+const WARM_TIMEOUT_MS = 8000;
+
+// Looping showcase video. `load` queues it to buffer ahead of time (it's near
+// the viewport) so it is ready before it scrolls in; `active` plays it. Only
+// one instance is active at a time, so phones never decode two at once.
 function VideoMedia({
   src,
   poster,
@@ -35,17 +51,76 @@ function VideoMedia({
   const ref = useRef<HTMLVideoElement>(null);
   const [armed, setArmed] = useState(false);
   const [ready, setReady] = useState(false);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const priming = useRef(false);
+  const warmDone = useRef<(() => void) | null>(null);
 
+  // Needed right now (hovered / centred before its turn): skip the queue.
   useEffect(() => {
-    if (load || active) setArmed(true);
-  }, [load, active]);
+    if (active) setArmed(true);
+  }, [active]);
 
+  // Near the viewport: wait for its turn in the queue, then attach the source.
+  useEffect(() => {
+    if (!load || armed) return;
+    let cancelled = false;
+    enqueueWarm(
+      () =>
+        new Promise<void>((resolve) => {
+          if (cancelled) return resolve();
+          warmDone.current = resolve;
+          setArmed(true);
+          window.setTimeout(resolve, WARM_TIMEOUT_MS);
+        }),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [load, armed]);
+
+  // Declared before the priming effect so, on the commit that arms it, this
+  // runs first and its pause() can't abort the priming play().
   useEffect(() => {
     const v = ref.current;
     if (!v || !armed) return;
-    if (active) v.play().catch(() => {});
-    else v.pause();
+    if (active) {
+      priming.current = false;
+      v.play().catch(() => {});
+    } else if (!priming.current) v.pause();
   }, [active, armed]);
+
+  // iOS (Safari and in-app browsers like Instagram) ignores preload="auto" and
+  // fetches nothing until play() is called. A muted play that pauses on its
+  // first frame makes it download and paint a frame ahead of time.
+  useEffect(() => {
+    const v = ref.current;
+    if (!v || !armed) return;
+    const finish = () => {
+      warmDone.current?.();
+      warmDone.current = null;
+    };
+    const onPlaying = () => {
+      if (priming.current && !activeRef.current) v.pause();
+      priming.current = false;
+    };
+    v.addEventListener("playing", onPlaying);
+    v.addEventListener("canplaythrough", finish);
+    v.addEventListener("error", finish);
+    if (!activeRef.current) {
+      priming.current = true;
+      v.play().catch(() => {
+        // Autoplay refused (e.g. iOS Low Power Mode): free the queue.
+        priming.current = false;
+        finish();
+      });
+    }
+    return () => {
+      v.removeEventListener("playing", onPlaying);
+      v.removeEventListener("canplaythrough", finish);
+      v.removeEventListener("error", finish);
+    };
+  }, [armed]);
 
   return (
     <video
@@ -173,7 +248,7 @@ function Media({
   );
 }
 
-// Mobile inline media. It starts buffering about two screens before it scrolls
+// Mobile inline media. It starts buffering about three screens before it scrolls
 // in; whether it plays is decided by useCentredMedia (one at a time).
 function InlineMedia({
   p,
@@ -201,7 +276,7 @@ function InlineMedia({
           io.disconnect();
         }
       },
-      { rootMargin: "200% 0px 200% 0px" },
+      { rootMargin: "300% 0px 300% 0px" },
     );
     io.observe(el);
     return () => {
@@ -361,7 +436,7 @@ export default function WorkList({ items }: { items: Project[] }) {
   });
 
   return (
-    <div ref={root} className="relative mt-16 md:mt-24" onPointerLeave={() => show(null)}>
+    <div ref={root} className="relative mt-16 md:mt-24" onPointerLeave={(e) => e.pointerType === "mouse" && show(null)}>
       <ul>
         {items.map((p, i) => {
           const dim = active !== null && active !== i;
@@ -371,7 +446,8 @@ export default function WorkList({ items }: { items: Project[] }) {
               <span className="row-line absolute inset-x-0 top-0 h-px origin-left bg-ink/15" />
               <Row
                 {...(p.href ? { href: p.href, target: "_blank", rel: "noopener noreferrer" } : {})}
-                onPointerEnter={() => show(i)}
+                // Touch fires pointerenter too; that re-rendered the list mid-scroll.
+                onPointerEnter={(e) => e.pointerType === "mouse" && show(i)}
                 onFocus={() => show(i)}
                 onBlur={() => show(null)}
                 className={`group grid gap-6 py-8 transition-opacity duration-500 md:grid-cols-[1.4fr_1fr] md:items-center md:gap-10 md:py-10 ${

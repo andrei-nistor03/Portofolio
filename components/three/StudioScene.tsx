@@ -1,24 +1,56 @@
 "use client";
 
-import { Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, Lightformer, PerspectiveCamera } from "@react-three/drei";
 import WallsModel from "./WallsModel";
 import PulsatingLight from "./PulsatingLight";
 import CameraRig from "./CameraRig";
 import { useIsTouch, useReducedMotion } from "@/lib/useMediaQuery";
+import { markSceneReady } from "@/lib/loader";
+
+// Mounted inside the model's Suspense boundary, so it only exists once the GLB
+// and texture have resolved. The first frame after that compiles the shaders,
+// uploads the texture and bakes the environment; by the third the walls are
+// genuinely on the canvas, which is what the loader waits for.
+const READY_AFTER_FRAMES = 3;
+function SceneReady({ onReady }: { onReady: () => void }) {
+  const frames = useRef(0);
+  useFrame(() => {
+    frames.current += 1;
+    if (frames.current === READY_AFTER_FRAMES) onReady();
+  });
+  return null;
+}
+
+// Starts and stops the render loop. Passing `frameloop` as a Canvas prop is not
+// enough: switching it from "never" to "always" only updates the store, and
+// R3F restarts its RAF loop solely on invalidate(). The scene mounts off-screen
+// (inactive), so on the first scroll-in nothing kicked the loop and the stage
+// stayed blank until a resize or pointer event happened to invalidate it.
+function FrameloopDriver({ active }: { active: boolean }) {
+  const setFrameloop = useThree((s) => s.setFrameloop);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    setFrameloop(active ? "always" : "never");
+    if (active) invalidate();
+  }, [active, setFrameloop, invalidate]);
+  return null;
+}
 
 // The LINKHAUS walls, relit for a dark stage. Ported from the studio hero.
 export default function StudioScene({ active }: { active: boolean }) {
   const isTouch = useIsTouch();
   const reduced = useReducedMotion();
   const heavy = !isTouch && !reduced;
+  // Render continuously (off-screen, behind the loader) until the model has
+  // been drawn, then only while the section is on screen.
+  const [ready, setReady] = useState(false);
 
   return (
     <Canvas
-      // Visibility comes from the tall section, not the sticky canvas, so the
-      // loop is running for the whole time the stage is on screen.
-      frameloop={active ? "always" : "never"}
+      // Loop is driven by FrameloopDriver below (from the tall section's
+      // visibility, not the sticky canvas).
       dpr={[1, heavy ? 1.75 : 1.25]}
       gl={{ antialias: !isTouch, alpha: true, powerPreference: "high-performance" }}
       shadows={heavy}
@@ -57,9 +89,18 @@ export default function StudioScene({ active }: { active: boolean }) {
             <Lightformer intensity={0.2} color="#2b4bff" position={[3, 1, -1]} scale={3} />
           </Environment>
         )}
+        {!ready && (
+          <SceneReady
+            onReady={() => {
+              setReady(true);
+              markSceneReady();
+            }}
+          />
+        )}
       </Suspense>
 
       <CameraRig />
+      <FrameloopDriver active={active || !ready} />
     </Canvas>
   );
 }

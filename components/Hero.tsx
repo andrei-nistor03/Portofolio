@@ -98,7 +98,7 @@ export default function Hero() {
     <section
       id="top"
       ref={root}
-      className="relative flex min-h-[100dvh] flex-col overflow-hidden px-4 pb-8 pt-24 md:px-8"
+      className="relative flex min-h-[100svh] flex-col overflow-hidden px-4 pb-8 pt-24 md:px-8"
     >
       <DotField className="hero-dots absolute inset-0 h-full w-full" />
 

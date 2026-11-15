@@ -28,6 +28,12 @@ export function completeIntro() {
   window.dispatchEvent(new Event(INTRO));
 }
 
+// The first-load loader stays up until the studio's 3D scene has actually
+// drawn the model (not just downloaded it), so the stage is never empty.
+let resolveScene: () => void = () => {};
+export const sceneReady = new Promise<void>((r) => (resolveScene = r));
+export const markSceneReady = () => resolveScene();
+
 export function onIntroComplete(cb: () => void) {
   if (loaderState.introDone) {
     cb();

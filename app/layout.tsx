@@ -36,7 +36,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd) }}
         />
         {children}
-        <div className="grain" aria-hidden />
       </body>
     </html>
   );

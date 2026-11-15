@@ -163,7 +163,7 @@ export default function Nav() {
       <div className="px-3 pt-3 md:pt-4">
         <nav
           aria-label="Primary"
-          className="nav-pill pointer-events-auto mx-auto flex h-14 max-w-[760px] items-center justify-between gap-2 rounded-full border border-ink/10 bg-paper/80 pl-5 pr-1.5 text-ink shadow-[0_10px_40px_-12px_rgba(13,13,13,0.25)] backdrop-blur-xl"
+          className="nav-pill pointer-events-auto mx-auto flex h-14 max-w-[760px] items-center justify-between gap-2 rounded-full border border-ink/10 bg-paper/95 pl-5 pr-1.5 text-ink shadow-[0_10px_40px_-12px_rgba(13,13,13,0.25)]"
         >
           <a href="#top" onClick={go("top")} className="display text-[1.7rem] leading-none" aria-label="Back to top">
             AN<span className="text-violet">.</span>

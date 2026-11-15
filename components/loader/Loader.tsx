@@ -3,12 +3,27 @@
 import { useEffect, useRef, useState } from "react";
 import { gsap, ScrollTrigger } from "@/lib/gsap";
 import { lenisRef, setScrollLocked } from "@/lib/lenis";
-import { completeIntro, loaderState, onNavigate, type LoadingStage } from "@/lib/loader";
+import { completeIntro, loaderState, onNavigate, sceneReady, type LoadingStage } from "@/lib/loader";
 import { useIsTouch, useReducedMotion } from "@/lib/useMediaQuery";
 import LoadingVisual from "./LoadingVisual";
 
 const wait = (s: number) => new Promise<void>((r) => gsap.delayedCall(s, r));
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
+
+// Safety net only: a GPU that never finishes (context lost, driver bug) must
+// not trap the visitor behind the loader forever.
+const SCENE_TIMEOUT_MS = 20000;
+
+function hasWebGL() {
+  try {
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl2") || c.getContext("webgl");
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    return !!gl;
+  } catch {
+    return false;
+  }
+}
 
 function jumpTo(id: string) {
   const el = document.getElementById(id);
@@ -79,12 +94,16 @@ export default function Loader() {
     });
     const fonts = document.fonts ? document.fonts.ready.then(() => undefined) : Promise.resolve();
     const minimum = wait(reduced ? 0.15 : 0.9);
+    // The studio's 3D walls: downloaded, compiled and drawn at least once.
+    const scene = hasWebGL()
+      ? Promise.race([sceneReady, new Promise<void>((r) => window.setTimeout(r, SCENE_TIMEOUT_MS))])
+      : Promise.resolve();
 
     (async () => {
       setStage("active");
       // Creep toward 85% while the real work finishes, then complete.
       const creep = progressTo(85, reduced ? 0.15 : 1.1);
-      await Promise.all([loaded, fonts, minimum]);
+      await Promise.all([loaded, fonts, minimum, scene]);
       await creep;
       await progressTo(100, 0.3);
       if (cancelled) return;
