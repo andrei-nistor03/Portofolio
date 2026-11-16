@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useRef } from "react";
-import { ArrowUpRight } from "@phosphor-icons/react";
-import { gsap, useGSAP } from "@/lib/gsap";
+import { ArrowDown, ArrowUpRight } from "@phosphor-icons/react";
+import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
 import { sceneState } from "@/lib/sceneState";
 import { useInView } from "@/lib/useInView";
 import { links, studioChapters } from "@/lib/content";
@@ -64,6 +64,44 @@ export default function Studio() {
         .to(".wordmark", { scale: 2.4, autoAlpha: 0, duration: 0.2 }, DIVE_START)
         .fromTo(".veil-violet", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.08 }, 0.84)
         .fromTo(".veil-paper", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.06 }, 0.9);
+
+      // Scroll cue: the pinned stage reads as "the end" between chapters, so a
+      // cue stays on until the next section (Work) is actually on screen. It
+      // turns into a "keep scrolling" nudge when the visitor pauses.
+      const cue = root.current?.querySelector<HTMLElement>(".scroll-cue");
+      if (!cue) return;
+      // It lasts through the dive, so it flips to ink once the paper veil is
+      // past half opacity (timeline time, so it tracks the scrubbed veil).
+      const PAPER_AT = 0.93;
+      tl.eventCallback("onUpdate", () => {
+        const tone = tl.time() >= PAPER_AT ? "ink" : "paper";
+        if (cue.dataset.tone !== tone) cue.dataset.tone = tone;
+      });
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      const armIdle = () => {
+        cue.dataset.idle = "false";
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => (cue.dataset.idle = "true"), 1200);
+      };
+      gsap.set(cue, { autoAlpha: 0 });
+      ScrollTrigger.create({
+        trigger: root.current,
+        start: "top 60%",
+        // Section bottom at 70% = Work's top 30% (its heading) is in view.
+        end: "bottom 70%",
+        onToggle: (self) => {
+          gsap.to(cue, { autoAlpha: self.isActive ? 1 : 0, duration: 0.5, overwrite: true });
+          if (self.isActive) armIdle();
+          else {
+            clearTimeout(idleTimer);
+            cue.dataset.idle = "false";
+          }
+        },
+        onUpdate: (self) => {
+          if (self.isActive) armIdle();
+        },
+      });
+      return () => clearTimeout(idleTimer);
     },
     { scope: root },
   );
@@ -129,6 +167,29 @@ export default function Studio() {
 
         <div className="veil-violet pointer-events-none invisible absolute inset-0 bg-[radial-gradient(circle_at_center,#e4d3ff_0%,#8a5cff_45%,#3a1785_100%)]" />
         <div className="veil-paper pointer-events-none invisible absolute inset-0 bg-paper" />
+
+        {/* Scroll cue, above the veils so it lasts through the dive. Right
+            edge, beside the model, centered on the visible screen (svh, so
+            it stays centered when the mobile browser toolbar shows). */}
+        <div
+          aria-hidden
+          data-idle="false"
+          data-tone="paper"
+          className="scroll-cue pointer-events-none invisible absolute right-4 top-[50svh] -translate-y-1/2 md:right-8"
+        >
+          <div className="scroll-cue-inner flex flex-col items-center gap-3 md:gap-4">
+            <span className="relative">
+              <span data-label="base" className="scroll-cue-label label block opacity-80">
+                Scroll
+              </span>
+              <span data-label="idle" className="scroll-cue-label label block">
+                Keep scrolling
+              </span>
+            </span>
+            <span className="scroll-cue-track" />
+            <ArrowDown weight="bold" className="size-5 md:size-7" />
+          </div>
+        </div>
       </div>
     </section>
   );

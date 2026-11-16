@@ -140,8 +140,94 @@ body {
   animation: marquee 38s linear infinite;
 }
 
+/* Studio scroll cue. Everything uses currentColor; data-tone flips it from
+   paper to ink when the paper veil floods in (see Studio.tsx). */
+.scroll-cue {
+  color: var(--color-paper);
+  transition: color 0.25s ease-out;
+}
+.scroll-cue[data-tone="ink"] {
+  color: var(--color-ink);
+}
+.scroll-cue-track {
+  position: relative;
+  width: 2px;
+  height: 3rem;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 25%, transparent);
+}
+/* Short phones: the chapter copy climbs high, keep the cue compact. */
+@media (max-height: 600px) {
+  .scroll-cue-track {
+    height: 2.25rem;
+  }
+}
+@media (min-width: 48rem) {
+  .scroll-cue-track {
+    height: 6.5rem;
+  }
+}
+.scroll-cue-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  height: 40%;
+  background: currentColor;
+  animation: cue-run 1.8s var(--ease-art) infinite;
+}
+@keyframes cue-run {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(250%);
+  }
+}
+@keyframes cue-nudge {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(12px);
+  }
+}
+.scroll-cue-label {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: opacity 0.5s var(--ease-art);
+}
+/* The longer idle label sizes the box and the short one overlays it at its
+   foot, right above the track, so swapping labels never moves anything. */
+.scroll-cue [data-label="base"] {
+  position: absolute;
+  inset: 0;
+  text-align: end;
+}
+.scroll-cue [data-label="idle"] {
+  opacity: 0;
+}
+.scroll-cue[data-idle="true"] [data-label="idle"] {
+  opacity: 1;
+}
+.scroll-cue[data-idle="true"] [data-label="base"] {
+  opacity: 0;
+}
+.scroll-cue[data-idle="true"] .scroll-cue-inner {
+  animation: cue-nudge 1.3s ease-in-out infinite;
+}
+@media (min-width: 48rem) {
+  .scroll-cue-label {
+    font-size: 1.1rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .marquee-track {
+  .marquee-track,
+  .scroll-cue-track::after,
+  .scroll-cue[data-idle="true"] .scroll-cue-inner {
     animation: none;
   }
   *,
