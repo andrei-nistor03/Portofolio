@@ -178,11 +178,12 @@ export default function Studio() {
           className="scroll-cue pointer-events-none invisible absolute right-4 top-[50svh] -translate-y-1/2 md:right-8"
         >
           <div className="scroll-cue-inner flex flex-col items-center gap-3 md:gap-4">
-            <span className="relative">
-              <span data-label="base" className="scroll-cue-label label block opacity-80">
+            <span className="relative block">
+              <span className="scroll-cue-ghost label">Keep scrolling</span>
+              <span data-label="base" className="scroll-cue-label label opacity-80">
                 Scroll
               </span>
-              <span data-label="idle" className="scroll-cue-label label block">
+              <span data-label="idle" className="scroll-cue-label label">
                 Keep scrolling
               </span>
             </span>

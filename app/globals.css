@@ -192,22 +192,40 @@ body {
     transform: translateY(12px);
   }
 }
+/* Labels are horizontal text rotated 90deg rather than writing-mode text:
+   WebKit (iOS Safari, in-app browsers) offsets sideways glyphs inside a
+   vertical line box, which threw them off the line's axis. A hidden
+   vertical-rl ghost of the longer label only sizes the box (1em wide, label
+   long); both visible labels are pinned to its center line. */
+.scroll-cue-ghost,
 .scroll-cue-label {
-  writing-mode: vertical-rl;
-  white-space: nowrap;
   font-size: 0.9rem;
   font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+.scroll-cue-ghost {
+  display: block;
+  writing-mode: vertical-rl;
+  visibility: hidden;
+}
+.scroll-cue-label {
+  position: absolute;
+  /* Rotating about the top-left corner swings the box left by its 1em
+     height, so this lands its center on the box's center line. */
+  left: calc(50% + 0.5em);
+  transform-origin: 0 0;
   transition: opacity 0.5s var(--ease-art);
 }
-/* The longer idle label sizes the box and the short one overlays it at its
-   foot, right above the track, so swapping labels never moves anything. */
-.scroll-cue [data-label="base"] {
-  position: absolute;
-  inset: 0;
-  text-align: end;
-}
 .scroll-cue [data-label="idle"] {
+  top: 0;
+  transform: rotate(90deg);
   opacity: 0;
+}
+/* The short label sits at the foot, right above the track. */
+.scroll-cue [data-label="base"] {
+  top: 100%;
+  transform: rotate(90deg) translateX(-100%);
 }
 .scroll-cue[data-idle="true"] [data-label="idle"] {
   opacity: 1;
@@ -219,6 +237,7 @@ body {
   animation: cue-nudge 1.3s ease-in-out infinite;
 }
 @media (min-width: 48rem) {
+  .scroll-cue-ghost,
   .scroll-cue-label {
     font-size: 1.1rem;
   }
